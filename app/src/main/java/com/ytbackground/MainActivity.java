@@ -1,10 +1,12 @@
 package com.ytbackground;
-
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
-
+import androidx.core.content.ContextCompat;
+import android.content.ComponentCallbacks2;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -17,25 +19,23 @@ import android.view.View;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements ComponentCallbacks2 {
     MyWebView webView;
-    String path;
+    boolean debug = true;
+    @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        String path;
         super.onCreate(savedInstanceState);
+        setRequestedOrientation (ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+
         Log.d("debug-ac","onCreate called");
         setContentView(R.layout.activity_main);
 
@@ -51,18 +51,21 @@ public class MainActivity extends AppCompatActivity {
         }
 
         SharedPreferences sharedpreferences = getSharedPreferences("YTB", Context.MODE_PRIVATE);
+        if(debug){
+            SharedPreferences.Editor editor = sharedpreferences.edit();
+            editor.putString("phone", "debugging");
+            editor.commit();
+        }
+
         String deviceModel = sharedpreferences.getString("phone","not_available");
         if(deviceModel==null || deviceModel.equals("not_available")){
             registerNewDevice(sharedpreferences);
         }else{
             final FirebaseDatabase database = FirebaseDatabase.getInstance();
-            final DatabaseReference totalUsers = database.getReference("totalUsers");
             DatabaseReference userDetails = database.getReference("userDetails");
             String[] accessedTime = getTime();
             userDetails.child(deviceModel+"").child(accessedTime[0]).setValue(accessedTime[1]);
         }
-
-
 
         path = "https://www.youtube.com";
         webView = (MyWebView)findViewById(R.id.webView);
@@ -74,7 +77,8 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = getIntent();
         String action = intent.getAction();
         String type = intent.getType();
-
+        if(action==null)
+            action="null";
         Log.d("debug-ac",action);
         if ( Intent.ACTION_MAIN.equals(action) && ((intent.getFlags() & Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT) == Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT)) {
             finish();
@@ -89,10 +93,38 @@ public class MainActivity extends AppCompatActivity {
                 webView.setWebViewClient(new WebViewClient());
                 webView.setWebChromeClient(new WebChromeClient());
                 webView.loadUrl(path);
-                Log.d("debug-a",path);
+                Log.d("debug-ac",path);
             }
         }
 
+        startService();
+    }
+
+    public void runJs(View view){
+        webView.loadUrl("javascript:(function(){"+
+                //"setInterval(function(){ " +
+                "    var x = document.getElementsByClassName(\"ytp-ad-skip-button\"); " +
+            //    "    var x = document.getElementsByClassName(\"ytp-upnext-autoplay-icon\"); " +
+                "    if(x.length!=0){ " +
+                "        x[0].click();  " +
+                "    }  " +
+               // "}, 1000); " +
+           //     "alert('sdf');"+
+                "})()");
+    }
+
+    public void startService(){
+        Intent serviceIntent = new Intent(this, ExampleService.class);
+        serviceIntent.putExtra("inputExtra", "start service");
+        ContextCompat.startForegroundService(this, serviceIntent);
+    }
+
+    public void startService(View view){
+        startService();
+    }
+    public void stopService(View view){
+        Intent serviceIntent = new Intent(this, ExampleService.class);
+        stopService(serviceIntent);
     }
 
     private static void registerNewDevice(final SharedPreferences sharedpreferences){
@@ -101,8 +133,6 @@ public class MainActivity extends AppCompatActivity {
         totalUsers.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                // This method is called once with the initial value and again
-                // whenever data at this location is updated.
                 Long userID = dataSnapshot.getValue(Long.class) ;
                 if(userID!=null) {
                     userID++;
@@ -121,19 +151,13 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onCancelled(DatabaseError error) {
-                // Failed to read value
                 Log.w("debug-ac", "Failed to read value.", error.toException());
             }
         });
-
-
-
-
     }
 
     private static String[] getTime(){
         Calendar calendar = Calendar.getInstance();
-        Date currentTime = Calendar.getInstance().getTime();
         String[] time = new String[2];
         time[0] =  calendar.getTime().getTime()+"";
         time[1] =  calendar.getTime().toLocaleString();
@@ -172,9 +196,50 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        String action = intent.getAction();
+        String type = intent.getType();
+
+        if(action==null)
+            action="null";
+        Log.d("debug-ac",action);
+        if (Intent.ACTION_SEND.equals(action) && type != null) {
+            if ("text/plain".equals(type)) {
+                String path = handleSendText(intent);
+                webView = (MyWebView)findViewById(R.id.webView);
+                webView.getSettings().setJavaScriptEnabled(true);
+                webView.setWebViewClient(new WebViewClient());
+                webView.setWebChromeClient(new WebChromeClient());
+                webView.loadUrl(path);
+                Log.d("debug-ac",path);
+            }
+        }
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         Log.d("debug-ac","onResume called");
+//        Intent intent = getIntent();
+//        String action = intent.getAction();
+//        String type = intent.getType();
+//
+//        if(action==null)
+//            action="null";
+//        Log.d("debug-ac",action);
+//        if (Intent.ACTION_SEND.equals(action) && type != null) {
+//            if ("text/plain".equals(type)) {
+//                String path = handleSendText(intent);
+//
+//                webView = (MyWebView)findViewById(R.id.webView);
+//                webView.getSettings().setJavaScriptEnabled(true);
+//                webView.setWebViewClient(new WebViewClient());
+//                webView.setWebChromeClient(new WebChromeClient());
+//                webView.loadUrl(path);
+//                Log.d("debug-ac",path);
+//            }
+//        }
     }
 
     @Override
@@ -215,6 +280,37 @@ public class MainActivity extends AppCompatActivity {
             return sharedText;
         }
         return "Invalid url";
+    }
+
+    public void onTrimMemory(int level) {
+        final FirebaseDatabase database = FirebaseDatabase.getInstance();
+        DatabaseReference userDetails = database.getReference("userDetails");
+        String[] accessedTime = getTime();
+        switch (level) {
+            case ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN:
+                Log.d("debug-ac", "TRIM_MEMORY_UI_HIDDEN");
+                userDetails.child("debugging").child(accessedTime[0]).setValue(accessedTime[1]+" TRIM_MEMORY_UI_HIDDEN");
+                break;
+
+            case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
+            case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
+            case ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL:
+                //Log.d("debug-ac", "TRIM_MEMORY_RUNNING_MODERATE " + ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE);
+                //userDetails.child("debugging").child(accessedTime[0]).setValue("TRIM_MEMORY_RUNNING_MODERATE " + ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE);
+                break;
+
+            case ComponentCallbacks2.TRIM_MEMORY_BACKGROUND:
+            case ComponentCallbacks2.TRIM_MEMORY_MODERATE:
+            case ComponentCallbacks2.TRIM_MEMORY_COMPLETE:
+               // Log.d("debug-ac", "TRIM_MEMORY_BACKGROUND " + ComponentCallbacks2.TRIM_MEMORY_BACKGROUND);
+                //userDetails.child("debugging").child(accessedTime[0]).setValue("TRIM_MEMORY_BACKGROUND " + ComponentCallbacks2.TRIM_MEMORY_BACKGROUND);
+                break;
+
+            default:
+                Log.d("debug-ac", "default");
+                userDetails.child("debugging").child(accessedTime[0]).setValue("default");
+                break;
+        }
     }
 
 }
