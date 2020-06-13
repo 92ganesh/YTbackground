@@ -1,21 +1,30 @@
 package com.ytbackground;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.ComponentCallbacks2;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.support.v4.media.session.MediaSessionCompat;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
+import android.webkit.ConsoleMessage;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -26,8 +35,11 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import java.util.Calendar;
 
+import static com.ytbackground.App.CHANNEL_ID;
+
 public class MainActivity extends AppCompatActivity implements ComponentCallbacks2 {
-    MyWebView webView;
+    static MyWebView webView;
+    static boolean isPlaying;
     boolean debug = true;
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
@@ -72,6 +84,16 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
         webView.getSettings().setJavaScriptEnabled(true);
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+                android.util.Log.d("WebView", consoleMessage.message());
+                if(consoleMessage.message().equals("switchPausePlay")){
+                    togglePausePlay();
+                }
+                return true;
+            }
+        });
         webView.loadUrl(path);
 
         Intent intent = getIntent();
@@ -100,16 +122,90 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
         startService();
     }
 
+    public void togglePausePlay(){
+        Context context = this;
+        MediaSessionCompat mediaSession = new MediaSessionCompat(context, "tag");
+        // Pending intent for main notification tap action
+        Intent notificationIntent = new Intent(context, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(context,
+                0, notificationIntent, 0);
+
+        // Pending intent for pausePlay button
+        Bitmap artwork = BitmapFactory.decodeResource(getResources(), R.drawable.icon_bmp);
+        Intent pausePlayIntent = new Intent(context, NotificationActionReceiver.class);
+        pausePlayIntent.putExtra("actionName", "pausePlay");
+        PendingIntent pausePlayPendingIntent =
+                PendingIntent.getBroadcast(context, 0, pausePlayIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+        NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.icon)
+                .setLargeIcon(artwork)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setColor(Color.RED)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true);
+
+        if(!isPlaying){
+            notificationBuilder.addAction(R.drawable.pause, "Pause", pausePlayPendingIntent);
+        }else{
+            notificationBuilder.addAction(R.drawable.play, "Play", pausePlayPendingIntent);
+        }
+        isPlaying = !isPlaying;
+
+        notificationBuilder.setStyle(new androidx.media.app.NotificationCompat.MediaStyle()
+                        .setShowActionsInCompactView(0)
+                        .setMediaSession(mediaSession.getSessionToken()));
+
+        Notification notification = notificationBuilder.build();
+
+        NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        mNotificationManager.notify(1, notification);
+    }
+
+    public static void runJs(){
+        webView.loadUrl("javascript:(function(){"+
+                //"setInterval(function(){ " +
+                //  "    var x = document.getElementsByClassName(\"ytp-ad-skip-button\"); " +
+                "    var x = document.getElementsByClassName(\"ytp-upnext-autoplay-icon\"); " +
+                "    if(x.length!=0){ " +
+                "        console.log('click');" +
+                "        x[0].click();  " +
+                "    }  " +
+                "console.log(x);" +
+                "console.log(x[0]);" +
+                // "}, 1000); " +
+                //     "alert('sdf');"+
+                "})()");
+    }
     public void runJs(View view){
         webView.loadUrl("javascript:(function(){"+
                 //"setInterval(function(){ " +
-                "    var x = document.getElementsByClassName(\"ytp-ad-skip-button\"); " +
-            //    "    var x = document.getElementsByClassName(\"ytp-upnext-autoplay-icon\"); " +
+                  "    var x = document.getElementsByClassName(\"ytp-ad-skip-button\"); " +
+           //     "    var x = document.getElementsByClassName(\"ytp-upnext-autoplay-icon\"); " +
                 "    if(x.length!=0){ " +
+                "        console.log('click');" +
                 "        x[0].click();  " +
                 "    }  " +
-               // "}, 1000); " +
-           //     "alert('sdf');"+
+                "console.log(x);" +
+                "console.log(x[0]);" +
+                // "}, 1000); " +
+                //     "alert('sdf');"+
+                "})()");
+    }
+
+    public static void pausePlay(){
+        webView.loadUrl("javascript:(function(){"+
+                //"setInterval(function(){ " +
+                //  "    var x = document.getElementsByClassName(\"ytp-ad-skip-button\"); " +
+                "    var x = document.getElementsByClassName(\"player-control-play-pause-icon\"); " +
+                "    if(x.length!=0){ " +
+                "        console.log('switchPausePlay');" +
+                "        x[0].click();  " +
+                "    }  " +
+                // "}, 1000); " +
+                //     "alert('sdf');"+
                 "})()");
     }
 
@@ -118,7 +214,6 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
         serviceIntent.putExtra("inputExtra", "start service");
         ContextCompat.startForegroundService(this, serviceIntent);
     }
-
     public void startService(View view){
         startService();
     }
@@ -221,25 +316,6 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
     protected void onResume() {
         super.onResume();
         Log.d("debug-ac","onResume called");
-//        Intent intent = getIntent();
-//        String action = intent.getAction();
-//        String type = intent.getType();
-//
-//        if(action==null)
-//            action="null";
-//        Log.d("debug-ac",action);
-//        if (Intent.ACTION_SEND.equals(action) && type != null) {
-//            if ("text/plain".equals(type)) {
-//                String path = handleSendText(intent);
-//
-//                webView = (MyWebView)findViewById(R.id.webView);
-//                webView.getSettings().setJavaScriptEnabled(true);
-//                webView.setWebViewClient(new WebViewClient());
-//                webView.setWebChromeClient(new WebChromeClient());
-//                webView.loadUrl(path);
-//                Log.d("debug-ac",path);
-//            }
-//        }
     }
 
     @Override
@@ -333,4 +409,6 @@ class MyWebView extends WebView {
         if (visibility != View.GONE && visibility != View.INVISIBLE)
             super.onWindowVisibilityChanged(visibility);
     }
+
+
 }
