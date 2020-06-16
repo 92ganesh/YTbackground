@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">YTbackground</string>
+    <string name="actionName">actionName</string>
 </resources>
