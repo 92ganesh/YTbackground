@@ -34,7 +34,7 @@ import com.google.firebase.database.ValueEventListener;
 import java.util.Calendar;
 
 public class MainActivity extends AppCompatActivity implements ComponentCallbacks2 {
-    boolean DEBUG = false;  //Make sure to set it false for release version
+    boolean DEBUG = true;  //Make sure to set it false for release version
     public static final String CHANNEL_ID="YTBServiceChannel";
     public static final String ACTION_NAME = "ACTION_NAME";
     public static final String PAUSE_PLAY = "PAUSE_PLAY";

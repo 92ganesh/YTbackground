@@ -39,7 +39,7 @@ public class ForegroundService extends Service {
                 PendingIntent.getBroadcast(this, 0, pausePlayIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
         notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.next)
+                .setSmallIcon(R.drawable.sound)
                 .setLargeIcon(artwork)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
