@@ -1,7 +1,6 @@
 # YTbackground
 Android app that plays youtube videos in background
 Have you ever wanted to play songs or videos in background while you are browsing or reading emails?
-but our sadly youtube does not let you do that without purchasing their premium service
 I have created an app that let you play youtube videos in background
 
 # App link(app size is of about 3 mb only)👇🏼
