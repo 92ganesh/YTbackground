@@ -14,5 +14,5 @@ https://github.com/92ganesh/YTbackground/releases/download/v1.0.0/YTB.v1.0.0.apk
 https://www.youtube.com/watch?v=J0hRnR-RefQ&feature=youtu.be
 
 
-## Note for Developers only
+## Note for Developers only👇🏼
 'google-services.json' which is required for firebase connection is removed from 'app' folder for obvious security reasons. Hence if you want to compile the app yourself then make appropriate changes
