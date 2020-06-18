@@ -34,7 +34,7 @@ import com.google.firebase.database.ValueEventListener;
 import java.util.Calendar;
 
 public class MainActivity extends AppCompatActivity implements ComponentCallbacks2 {
-    boolean DEBUG = true;  //Make sure to set it false for release version
+    boolean DEBUG = false;     //Make sure to set it false for release version
     public static final String CHANNEL_ID="YTBServiceChannel";
     public static final String ACTION_NAME = "ACTION_NAME";
     public static final String PAUSE_PLAY = "PAUSE_PLAY";
@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        //hide status bar for apk level <4.1
+        //hide status bar for api level <4.1
         //This also works for higher versions too and provides auto hide of status bar
         this.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -122,7 +122,7 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
             public void onShowCustomView(View view, WebChromeClient.CustomViewCallback callback) {
                 super.onShowCustomView(view,callback);
                 //set view in landscape mode when user requests for full screen
-                setRequestedOrientation (ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE);
+                setRequestedOrientation (ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
 
                 // Hide both the navigation bar and the status bar
                 View decorView = getWindow().getDecorView();
@@ -223,12 +223,12 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
         // Pending intent for pausePlay button
         Bitmap artwork = BitmapFactory.decodeResource(getResources(), R.drawable.icon_bmp);
         Intent pausePlayIntent = new Intent(context, NotificationActionReceiver.class);
-        pausePlayIntent.putExtra("actionName", "pausePlay");
+        pausePlayIntent.putExtra(ACTION_NAME, PAUSE_PLAY);
         PendingIntent pausePlayPendingIntent =
                 PendingIntent.getBroadcast(context, 0, pausePlayIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
         NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.icon)
+                .setSmallIcon(R.drawable.sound)
                 .setLargeIcon(artwork)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
@@ -238,9 +238,9 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
                 .setOnlyAlertOnce(true);
 
         if(!isPlaying){
-            notificationBuilder.addAction(R.drawable.pause, "Pause", pausePlayPendingIntent);
+            notificationBuilder.addAction(R.drawable.pause, PAUSE_PLAY, pausePlayPendingIntent);
         }else{
-            notificationBuilder.addAction(R.drawable.play, "Play", pausePlayPendingIntent);
+            notificationBuilder.addAction(R.drawable.play, PAUSE_PLAY, pausePlayPendingIntent);
         }
         isPlaying = !isPlaying;
 
