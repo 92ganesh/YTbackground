@@ -15,6 +15,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -66,18 +67,29 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
         if(getSupportActionBar()!=null)
             getSupportActionBar().hide();
 
-//        //Ask for permission to ignore battery optimisation
-//        // This is not needed as app is running as foreground service
-//        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-//            Intent intent = new Intent();
-//            String packageName = getPackageName();
-//            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-//            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-//                intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-//                intent.setData(Uri.parse("package:" + packageName));
-//                startActivity(intent);
-//            }
-//        }
+        final FrameLayout customViewContainer = findViewById(R.id.frame);  //used to display full screen videos
+        decorView.setOnSystemUiVisibilityChangeListener
+                (new View.OnSystemUiVisibilityChangeListener() {
+                    @Override
+                    public void onSystemUiVisibilityChange(int visibility) {
+                        // Used to hide navigation bar in full screen mode
+                        if ((visibility & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0) {
+                            //following method is called with a delay
+                            //It auto hides the navigation bar after user clicks on video in full screen mode
+                            new Handler().postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        if(customViewContainer.getVisibility()==View.VISIBLE && webView.getVisibility()==View.GONE) {
+                                            View decorView = getWindow().getDecorView();
+                                            int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                                                    | View.SYSTEM_UI_FLAG_FULLSCREEN;
+                                            decorView.setSystemUiVisibility(uiOptions);
+                                        }
+                                    }
+                                }, 1500);
+                        }
+                    }
+                });
 
         SharedPreferences sharedpreferences = getSharedPreferences("YTB", Context.MODE_PRIVATE);
 
@@ -102,7 +114,6 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
         }
 
         String path = "https://www.youtube.com";
-        final FrameLayout customViewContainer = findViewById(R.id.frame);  //used to display full screen videos
         webView = (MyWebView)findViewById(R.id.webView);
         webView.getSettings().setJavaScriptEnabled(true);
         webView.setWebViewClient(new WebViewClient());
@@ -125,6 +136,8 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
                 setRequestedOrientation (ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
 
                 // Hide both the navigation bar and the status bar
+                //note any user activity will clear flags which needs to set again
+                //see decorView.setOnSystemUiVisibilityChangeListener()
                 View decorView = getWindow().getDecorView();
                 int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_FULLSCREEN;
