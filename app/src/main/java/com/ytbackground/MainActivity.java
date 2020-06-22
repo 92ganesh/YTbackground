@@ -13,8 +13,10 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -34,7 +36,7 @@ import com.google.firebase.database.ValueEventListener;
 import java.util.Calendar;
 
 public class MainActivity extends AppCompatActivity implements ComponentCallbacks2 {
-    boolean DEBUG = true;  //Make sure to set it false for release version
+    boolean DEBUG = false;     //Make sure to set it false for release version
     public static final String CHANNEL_ID="YTBServiceChannel";
     public static final String ACTION_NAME = "ACTION_NAME";
     public static final String PAUSE_PLAY = "PAUSE_PLAY";
@@ -49,7 +51,7 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        //hide status bar for apk level <4.1
+        //hide status bar for api level <4.1
         //This also works for higher versions too and provides auto hide of status bar
         this.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -66,18 +68,30 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
         if(getSupportActionBar()!=null)
             getSupportActionBar().hide();
 
-//        //Ask for permission to ignore battery optimisation
-//        // This is not needed as app is running as foreground service
-//        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-//            Intent intent = new Intent();
-//            String packageName = getPackageName();
-//            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-//            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-//                intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-//                intent.setData(Uri.parse("package:" + packageName));
-//                startActivity(intent);
-//            }
-//        }
+        final FrameLayout customViewContainer = findViewById(R.id.frame);  //used to display full screen videos
+        // BUG:- following code is used to hide nav bar but it rises another problem defined in onShowCustomView()
+//        decorView.setOnSystemUiVisibilityChangeListener
+//                (new View.OnSystemUiVisibilityChangeListener() {
+//                    @Override
+//                    public void onSystemUiVisibilityChange(int visibility) {
+//                        // Used to hide navigation bar in full screen mode
+//                        if ((visibility & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0) {
+//                            //following method is called with a delay
+//                            //It auto hides the navigation bar after user clicks on video in full screen mode
+//                            new Handler().postDelayed(new Runnable() {
+//                                    @Override
+//                                    public void run() {
+//                                        if(customViewContainer.getVisibility()==View.VISIBLE && webView.getVisibility()==View.GONE) {
+//                                            View decorView = getWindow().getDecorView();
+//                                            int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+//                                                    | View.SYSTEM_UI_FLAG_FULLSCREEN;
+//                                            decorView.setSystemUiVisibility(uiOptions);
+//                                        }
+//                                    }
+//                                }, 1500);
+//                        }
+//                    }
+//                });
 
         SharedPreferences sharedpreferences = getSharedPreferences("YTB", Context.MODE_PRIVATE);
 
@@ -102,12 +116,21 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
         }
 
         String path = "https://www.youtube.com";
-        final FrameLayout customViewContainer = findViewById(R.id.frame);  //used to display full screen videos
         webView = (MyWebView)findViewById(R.id.webView);
         webView.getSettings().setJavaScriptEnabled(true);
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient(){
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                if (url != null && url.startsWith("whatsapp://")) {
+                    view.getContext().startActivity(
+                            new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        });
         webView.setWebChromeClient(new WebChromeClient() {
-
             //toggle icon of pause/play in notification when there is output as "switchPausePlay" on js console
             @Override
             public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
@@ -122,13 +145,16 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
             public void onShowCustomView(View view, WebChromeClient.CustomViewCallback callback) {
                 super.onShowCustomView(view,callback);
                 //set view in landscape mode when user requests for full screen
-                setRequestedOrientation (ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE);
+                setRequestedOrientation (ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
 
-                // Hide both the navigation bar and the status bar
-                View decorView = getWindow().getDecorView();
-                int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_FULLSCREEN;
-                decorView.setSystemUiVisibility(uiOptions);
+                 // BUG: with nav bar hidden, it takes two clicks to show controls. One to unhide nav bar and other to actually show the control
+//                // Hide both the navigation bar and the status bar
+//                //note any user activity will clear flags which needs to set again
+//                //see decorView.setOnSystemUiVisibilityChangeListener()
+//                View decorView = getWindow().getDecorView();
+//                int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+//                        | View.SYSTEM_UI_FLAG_FULLSCREEN;
+//                decorView.setSystemUiVisibility(uiOptions);
 
                 webView.setVisibility(View.GONE);
                 customViewContainer.setVisibility(View.VISIBLE);
@@ -223,12 +249,12 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
         // Pending intent for pausePlay button
         Bitmap artwork = BitmapFactory.decodeResource(getResources(), R.drawable.icon_bmp);
         Intent pausePlayIntent = new Intent(context, NotificationActionReceiver.class);
-        pausePlayIntent.putExtra("actionName", "pausePlay");
+        pausePlayIntent.putExtra(ACTION_NAME, PAUSE_PLAY);
         PendingIntent pausePlayPendingIntent =
                 PendingIntent.getBroadcast(context, 0, pausePlayIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
         NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.icon)
+                .setSmallIcon(R.drawable.sound)
                 .setLargeIcon(artwork)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
@@ -238,9 +264,9 @@ public class MainActivity extends AppCompatActivity implements ComponentCallback
                 .setOnlyAlertOnce(true);
 
         if(!isPlaying){
-            notificationBuilder.addAction(R.drawable.pause, "Pause", pausePlayPendingIntent);
+            notificationBuilder.addAction(R.drawable.pause, PAUSE_PLAY, pausePlayPendingIntent);
         }else{
-            notificationBuilder.addAction(R.drawable.play, "Play", pausePlayPendingIntent);
+            notificationBuilder.addAction(R.drawable.play, PAUSE_PLAY, pausePlayPendingIntent);
         }
         isPlaying = !isPlaying;
 
